@@ -49,38 +49,41 @@ def load_dataset():
             y.append(target)  # y is the targets/labels (buys vs sell/notbuy)
 
         return np.array(X), y, coefs  # return X and y...and make X a numpy array!
+    def load_raw_csv():
+        print(" - Reading csv.")
+        raw_data = pd.read_csv("data/BTCUSDT_small.csv")
+        print(" - Setting up csv.")
+        raw_data.set_index("date", inplace=True)
 
-    print(" - Reading csv.")
-    raw_data = pd.read_csv("data/BTCUSDT.csv")
-    print(" - Setting up csv.")
-    raw_data.set_index("date", inplace=True)
+        raw_data.fillna(method="ffill", inplace=True)  # if there are gaps in data, use previously known values
+        raw_data.dropna(inplace=True)
 
-    raw_data.fillna(method="ffill", inplace=True)  # if there are gaps in data, use previously known values
-    raw_data.dropna(inplace=True)
+        raw_data['target'] = raw_data['close'].shift(-FUTURE_PERIOD_PREDICT)
 
-    raw_data['target'] = raw_data['close'].shift(-FUTURE_PERIOD_PREDICT)
+        raw_data.dropna(inplace=True)
 
-    raw_data.dropna(inplace=True)
+        print(" - Creating train and validation datasets.")
+        ## here, split away some slice of the future data from the main main_df.
+        times = sorted(raw_data.index.values)
+        last_5pct = sorted(raw_data.index.values)[-int(0.05*len(times))]
 
-    print(" - Creating train and validation datasets.")
-    ## here, split away some slice of the future data from the main main_df.
-    times = sorted(raw_data.index.values)
-    last_5pct = sorted(raw_data.index.values)[-int(0.05*len(times))]
+        validation_data = raw_data[(raw_data.index >= last_5pct)]
+        raw_data = raw_data[(raw_data.index < last_5pct)]
 
-    validation_data = raw_data[(raw_data.index >= last_5pct)]
-    raw_data = raw_data[(raw_data.index < last_5pct)]
+        print(" - Process datasets")
+        train_x, train_y, coefs = preprocess_df(raw_data)
+        # Do not shuffle the validation for an easy plot
+        validation_x, validation_y, _ = preprocess_df(validation_data, coefs, False)
 
-    print(" - Process datasets")
-    train_x, train_y, coefs = preprocess_df(raw_data)
-    # Do not shuffle the validation for an easy plot
-    validation_x, validation_y, _ = preprocess_df(validation_data, coefs, False)
+        return train_x, train_y, validation_x, validation_y
 
-    return train_x, train_y, validation_x, validation_y
+    # TODO: Save the processed dataset as tfrecord and check if exists
+    return load_raw_csv()
 
 def main():
     print("Loading dataset.")
     dataset = load_dataset()
-    AISquared()
+    AISquared(dataset)
 
 if __name__ == '__main__':
     print("Launching test script.")
